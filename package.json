@@ -1,0 +1,97 @@
+{
+  "name": "@pinooxhq/auth",
+  "version": "0.1.0",
+  "description": "Auth for Pinoox themes — zero configuration. Token/session, authorized HTTP, and login redirects for Vue, React, and Svelte.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js",
+      "require": "./dist/vue/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "import": "./dist/svelte/index.js",
+      "require": "./dist/svelte/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "axios": ">=1",
+    "pinia": ">=2",
+    "react": ">=18",
+    "svelte": ">=4",
+    "vue": ">=3",
+    "vue-router": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "pinia": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "vue-router": {
+      "optional": true
+    },
+    "axios": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "pinia": "^3.0.4",
+    "react": "^19.1.0",
+    "svelte": "^5.56.4",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vue": "^3.5.35",
+    "vue-router": "^4.6.4"
+  },
+  "keywords": [
+    "pinoox",
+    "auth",
+    "jwt",
+    "spa",
+    "vue",
+    "react",
+    "svelte"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pinoox/auth"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
