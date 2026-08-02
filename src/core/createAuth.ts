@@ -1,6 +1,7 @@
 import { createLogger, type AuthLogger } from './logger';
 import { resolveConfig, type CreateAuthOptions } from './resolveConfig';
 import { createStorage, type TokenStorage } from './storage';
+import { jwtMatchesAuthKey } from './jwt';
 import { extractTokenAndUser, localLogin } from '../strategies/local';
 import { buildRemoteLoginUrl, redirectToRemoteLogin } from '../strategies/remote';
 import { createFetchProvider, type HttpClient } from '../http/types';
@@ -102,12 +103,42 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
     storage.set(value);
   };
 
-  const getAuthHeader = (): string | null => {
-    if (config.mode !== 'jwt' || !token) {
+  const resolveToken = (): string | null => {
+    const current = token ?? storage.get();
+    if (!current) {
       return null;
     }
 
-    return token.toLowerCase().startsWith('bearer ') ? token : `Bearer ${token}`;
+    if (config.mode === 'jwt' && config.key && !jwtMatchesAuthKey(current, config.key)) {
+      logger.warn('mismatch.key', 'In-memory JWT claim does not match auth.key — recovering', {
+        key: config.key,
+      });
+      // Clear memory + bad localStorage only; keep cookie so storage.get() can recover.
+      token = null;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(config.key);
+        }
+      } catch {
+        // ignore
+      }
+      return storage.get();
+    }
+
+    return current;
+  };
+
+  const getAuthHeader = (): string | null => {
+    if (config.mode !== 'jwt') {
+      return null;
+    }
+
+    const current = resolveToken();
+    if (!current) {
+      return null;
+    }
+
+    return current.toLowerCase().startsWith('bearer ') ? current : `Bearer ${current}`;
   };
 
   const getRequestAuth = (): AuthRequestAuth => ({
@@ -264,7 +295,7 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       user = value;
     },
     get token() {
-      return token ?? storage.get();
+      return resolveToken();
     },
     set token(value) {
       syncToken(value);
@@ -273,7 +304,7 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       // JWT: storage is source of truth. In-memory `token` may be null after
       // a fresh page load even though localStorage still holds the JWT.
       if (config.mode === 'jwt') {
-        return !!(token ?? storage.get());
+        return !!resolveToken();
       }
       return authenticated;
     },
@@ -283,7 +314,7 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
     login,
     logout,
     me,
-    getToken: () => token ?? storage.get(),
+    getToken: () => resolveToken(),
     setToken: (value) => {
       syncToken(value);
     },

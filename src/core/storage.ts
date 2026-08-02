@@ -1,4 +1,5 @@
 import type { AuthLogger } from './logger';
+import { jwtMatchesAuthKey } from './jwt';
 
 export interface TokenStorage {
   get: () => string | null;
@@ -40,6 +41,23 @@ function isDev(): boolean {
   }
 }
 
+function acceptToken(value: string | null, key: string, logger?: AuthLogger): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (!key) {
+    return value;
+  }
+
+  if (jwtMatchesAuthKey(value, key)) {
+    return value;
+  }
+
+  logger?.warn('mismatch.key', 'Stored JWT claim does not match auth.key — discarding', { key });
+  return null;
+}
+
 export function createStorage(key: string, logger?: AuthLogger): TokenStorage {
   const syncDevCookie = isDev();
 
@@ -51,7 +69,7 @@ export function createStorage(key: string, logger?: AuthLogger): TokenStorage {
 
       try {
         if (typeof localStorage !== 'undefined') {
-          const fromStorage = localStorage.getItem(key)?.trim() || null;
+          const fromStorage = acceptToken(localStorage.getItem(key)?.trim() || null, key, logger);
 
           if (fromStorage) {
             if (syncDevCookie) {
@@ -60,20 +78,23 @@ export function createStorage(key: string, logger?: AuthLogger): TokenStorage {
 
             return fromStorage;
           }
+
+          // Stale / wrong-app token left in LS — drop it so cookie can recover.
+          if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+          }
         }
       } catch (error) {
         logger?.warn('token.storage', 'Failed to read localStorage', { error: String(error) });
       }
 
-      if (!syncDevCookie) {
-        return null;
-      }
-
-      const fromCookie = readCookie(key);
+      const fromCookie = acceptToken(readCookie(key), key, logger);
 
       if (fromCookie) {
         try {
-          localStorage.setItem(key, fromCookie);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(key, fromCookie);
+          }
         } catch {
           // ignore
         }
@@ -96,7 +117,15 @@ export function createStorage(key: string, logger?: AuthLogger): TokenStorage {
 
       try {
         if (token) {
-          const value = token.trim();
+          const value = acceptToken(token.trim(), key, logger);
+          if (!value) {
+            localStorage.removeItem(key);
+            if (syncDevCookie) {
+              deleteCookie(key);
+            }
+            return;
+          }
+
           localStorage.setItem(key, value);
           logger?.debug('token.stored', 'Token stored', { key });
 

@@ -10,8 +10,10 @@ export {
 } from './core/createAuth';
 export type { AuthInstance, CreateAuthConfig } from './core/createAuth';
 export { resolveConfig, resolveEndpoint, joinUrl } from './core/resolveConfig';
-export type { CreateAuthOptions } from './core/resolveConfig';export { createStorage } from './core/storage';
+export type { CreateAuthOptions } from './core/resolveConfig';
+export { createStorage } from './core/storage';
 export { createLogger } from './core/logger';
+export { jwtMatchesAuthKey, decodeJwtPayload, normalizeBearerToken } from './core/jwt';
 export { createFetchProvider } from './http/fetchProvider';
 export { createHttp } from './http/createHttp';
 export type {
