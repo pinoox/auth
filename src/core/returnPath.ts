@@ -1,7 +1,14 @@
 import type { PinooxBootstrap } from './types';
+import type { ResolvedAuthConfig } from './types';
 
 const DEFAULT_FALLBACK = '/';
 const DEFAULT_BLOCKED = ['/account'];
+
+/** Paths we must not bounce back into (login loops). Never block the app itself. */
+export function loginBlockedPrefixes(config: Pick<ResolvedAuthConfig, 'loginUrl'>): string[] {
+  const loginPath = (config.loginUrl ?? '/login').split('?')[0] || '/login';
+  return [...new Set([loginPath, '/login', '/account/login', '/account'])];
+}
 
 export function isSafeReturnPath(
   value: unknown,

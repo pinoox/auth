@@ -1,6 +1,6 @@
 import type { AuthLogger } from '../core/logger';
 import type { ResolvedAuthConfig } from '../core/types';
-import { resolveReturnPath } from '../core/returnPath';
+import { loginBlockedPrefixes, resolveReturnPath } from '../core/returnPath';
 
 export function buildRemoteLoginUrl(
   config: ResolvedAuthConfig,
@@ -8,7 +8,7 @@ export function buildRemoteLoginUrl(
   logger?: AuthLogger,
 ): string {
   const loginUrl = config.loginUrl ?? '/account/login';
-  const blocked = config.appPath ? [config.appPath, '/account'] : ['/account'];
+  const blocked = loginBlockedPrefixes(config);
   const safeRedirect = resolveReturnPath(
     returnPath
       ?? (typeof window !== 'undefined'

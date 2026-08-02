@@ -52,7 +52,7 @@ function readSnapshot(auth: AuthInstance): AuthSnapshot {
   return {
     user,
     token,
-    isAuthenticated: auth.isAuthenticated || (!!token && !!user),
+    isAuthenticated: auth.isAuthenticated || !!token,
   };
 }
 

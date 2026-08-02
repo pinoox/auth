@@ -70,7 +70,8 @@ export function useAuth(): UseAuthReturn {
   auth.on('logout', syncFromAuth);
 
   const isAuthenticated = computed(() => {
-    return auth.isAuthenticated || (!!token.value && !!user.value);
+    // JWT in storage is enough — profile (`user`) may load later via me().
+    return auth.isAuthenticated || !!token.value;
   });
 
   const me = async (): Promise<AuthUser | null> => {
@@ -165,6 +166,10 @@ export function createPiniaAuthStore(defineStore: typeof import('pinia').defineS
       canUserAccess: canAccess,
       syncTokenFromStorage: () => {
         const latest = auth.getToken();
+        if (latest) {
+          // Hydrate in-memory token so getAuthHeader() works immediately.
+          auth.setToken(latest);
+        }
         token.value = latest;
         return !!latest;
       },

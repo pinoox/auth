@@ -85,7 +85,7 @@ export function createAuthStore(options: CreateAuthConfig = {}): AuthStore {
   auth.on('unauthorized', syncFromAuth);
 
   const isAuthenticated = derived([user, token], ([$user, $token]) => {
-    return auth.isAuthenticated || (!!$token && !!$user);
+    return auth.isAuthenticated || !!$token;
   });
 
   const me = async (): Promise<AuthUser | null> => {

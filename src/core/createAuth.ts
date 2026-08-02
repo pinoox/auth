@@ -8,6 +8,7 @@ import {
   redirectToReturn,
   resolveReturnPath,
   toAbsoluteReturnUrl,
+  loginBlockedPrefixes,
 } from './returnPath';
 import type {
   AuthEvent,
@@ -269,7 +270,12 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       syncToken(value);
     },
     get isAuthenticated() {
-      return authenticated && (!!token || config.mode !== 'jwt');
+      // JWT: storage is source of truth. In-memory `token` may be null after
+      // a fresh page load even though localStorage still holds the JWT.
+      if (config.mode === 'jwt') {
+        return !!(token ?? storage.get());
+      }
+      return authenticated;
     },
     set isAuthenticated(value) {
       authenticated = value;
@@ -298,24 +304,36 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
         return;
       }
 
-      const url = config.loginUrl ?? config.endpoints.login;
-      logger.info('redirect.login', 'Redirecting to login', { url });
-
-      if (typeof window !== 'undefined') {
-        window.location.href = url;
+      if (typeof window === 'undefined') {
+        return;
       }
+
+      const loginUrl = config.loginUrl ?? '/login';
+      const loginPath = loginUrl.split('?')[0] || '/login';
+      const candidate =
+        returnPath
+        ?? `${window.location.pathname}${window.location.search}`;
+      // Block only login itself (loop); allow in-app return paths.
+      const redirect = resolveReturnPath(candidate, '/', loginBlockedPrefixes(config));
+      const url =
+        redirect && redirect !== loginPath
+          ? `${loginUrl}${loginUrl.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(redirect)}`
+          : loginUrl;
+
+      logger.info('redirect.login', 'Redirecting to login', { url });
+      window.location.href = url;
     },
     getReturnPath: (queryOrPath, fallback = '/') => {
-      const blocked = config.appPath ? [config.appPath] : ['/account'];
+      const blocked = loginBlockedPrefixes(config);
       return resolveReturnPath(queryOrPath, fallback, blocked);
     },
     getReturnUrl: (queryOrPath, fallback = '/') => {
-      const blocked = config.appPath ? [config.appPath] : ['/account'];
+      const blocked = loginBlockedPrefixes(config);
       const path = resolveReturnPath(queryOrPath, fallback, blocked);
       return toAbsoluteReturnUrl(path, config.siteOrigin);
     },
     redirectBack: (queryOrPath, fallback = '/') => {
-      const blocked = config.appPath ? [config.appPath] : ['/account'];
+      const blocked = loginBlockedPrefixes(config);
       logger.info('redirect.back', 'Redirecting after auth', { queryOrPath, fallback });
       redirectToReturn(queryOrPath, {
         fallback,
@@ -324,7 +342,7 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       });
     },
     getRedirectQuery: (queryOrPath, fallback = '/') => {
-      const blocked = config.appPath ? [config.appPath] : ['/account'];
+      const blocked = loginBlockedPrefixes(config);
       return { redirect: resolveReturnPath(queryOrPath, fallback, blocked) };
     },
     notifyUnauthorized: (payload) => {
