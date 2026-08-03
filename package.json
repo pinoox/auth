@@ -68,6 +68,7 @@
     }
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "@types/react": "^19.1.8",
     "pinia": "^3.0.4",
     "react": "^19.1.0",
