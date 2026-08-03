@@ -193,15 +193,9 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
   };
 
   const me = async (): Promise<AuthUser | null> => {
-    const current = storage.get();
-    token = current;
-
-    if (config.mode === 'jwt' && !current) {
-      authenticated = false;
-      user = null;
-      logger.debug('session.unauthorized', 'No token for me()', { mode: config.mode });
-      return null;
-    }
+    // Prefer stored/dev JWT, but never skip the request — HttpOnly server
+    // cookies authenticate via credentials: 'include' without readable storage.
+    token = resolveToken();
 
     try {
       const response = await http.request({
@@ -232,9 +226,18 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       }
 
       const extracted = extractTokenAndUser(response.data);
+
+      if (extracted.token) {
+        syncToken(extracted.token);
+      }
+
       user = extracted.user ?? (response.data as AuthUser);
       authenticated = true;
-      logger.info('session.ok', 'Session validated', { hasUser: !!user });
+      logger.info('session.ok', 'Session validated', {
+        hasUser: !!user,
+        hasToken: !!resolveToken(),
+        viaCookie: !extracted.token && !token,
+      });
       return user;
     } catch (error) {
       logger.error('error', 'me() threw', { error: String(error) });
@@ -301,10 +304,10 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
       syncToken(value);
     },
     get isAuthenticated() {
-      // JWT: storage is source of truth. In-memory `token` may be null after
-      // a fresh page load even though localStorage still holds the JWT.
+      // JWT may live only in an HttpOnly cookie (readable by me()/API via
+      // credentials). In that case `authenticated` is set after a successful me().
       if (config.mode === 'jwt') {
-        return !!resolveToken();
+        return authenticated || !!resolveToken();
       }
       return authenticated;
     },

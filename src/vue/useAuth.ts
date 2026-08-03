@@ -87,12 +87,7 @@ export function useAuth(): UseAuthReturn {
       return true;
     }
 
-    if (!token.value && auth.config.mode === 'jwt') {
-      auth.isAuthenticated = false;
-      user.value = null;
-      return false;
-    }
-
+    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
     const profile = await me();
     return !!profile || auth.isAuthenticated;
   };

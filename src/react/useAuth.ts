@@ -128,17 +128,11 @@ export function useAuth(): UseAuthReturn {
   }, [auth]);
 
   const canAccess = useCallback(async (refresh = false): Promise<boolean> => {
-    const token = auth.getToken();
-
     if (!refresh && auth.isAuthenticated) {
       return true;
     }
 
-    if (!token && auth.config.mode === 'jwt') {
-      auth.isAuthenticated = false;
-      return false;
-    }
-
+    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
     const profile = await auth.me();
     return !!profile || auth.isAuthenticated;
   }, [auth]);

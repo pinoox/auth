@@ -101,12 +101,7 @@ export function createAuthStore(options: CreateAuthConfig = {}): AuthStore {
       return true;
     }
 
-    if (!auth.getToken() && auth.config.mode === 'jwt') {
-      auth.isAuthenticated = false;
-      user.set(null);
-      return false;
-    }
-
+    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
     const profile = await me();
     return !!profile || auth.isAuthenticated;
   };

@@ -36,14 +36,75 @@ export function extractTokenAndUser(payload: unknown): { token: string | null; u
   };
 }
 
-export async function localLogin(
+function extractErrorCode(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const error = record.error;
+
+  if (error && typeof error === 'object') {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'string' && code) {
+      return code;
+    }
+  }
+
+  if (typeof record.code === 'string' && record.code) {
+    return record.code;
+  }
+
+  return null;
+}
+
+function extractErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+
+  const record = payload as Record<string, unknown>;
+  const error = record.error;
+
+  if (error && typeof error === 'object') {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+
+  if (typeof record.message === 'string') {
+    return record.message;
+  }
+
+  return '';
+}
+
+function isAlreadyAuthenticated(payload: unknown, status: number): boolean {
+  const code = extractErrorCode(payload);
+  if (code === 'ALREADY_AUTHENTICATED') {
+    return true;
+  }
+
+  const message = extractErrorMessage(payload);
+  if (/already\s+logged\s+in/i.test(message)) {
+    return true;
+  }
+
+  // Some older controllers return a lang key
+  if (status === 401 && /already_logged_in/i.test(JSON.stringify(payload ?? {}))) {
+    return true;
+  }
+
+  return false;
+}
+
+async function postLogin(
   config: ResolvedAuthConfig,
   http: HttpClient,
-  storage: TokenStorage,
   credentials: LoginCredentials,
-  logger?: AuthLogger,
-): Promise<LoginResult> {
-  const response = await http.request({
+) {
+  return http.request({
     url: config.endpoints.login,
     method: 'POST',
     body: credentials,
@@ -53,6 +114,53 @@ export async function localLogin(
       'X-Requested-With': 'XMLHttpRequest',
     },
   });
+}
+
+/**
+ * Clear a stuck HttpOnly server session so a fresh login can issue a JWT
+ * the SPA can store (localStorage / Authorization header).
+ */
+async function clearServerSession(
+  config: ResolvedAuthConfig,
+  http: HttpClient,
+  storage: TokenStorage,
+  logger?: AuthLogger,
+): Promise<void> {
+  try {
+    await http.request({
+      url: config.endpoints.logout,
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+  } catch (error) {
+    logger?.warn('error', 'Logout during already-authenticated recover failed', {
+      error: String(error),
+    });
+  }
+
+  storage.clear();
+}
+
+export async function localLogin(
+  config: ResolvedAuthConfig,
+  http: HttpClient,
+  storage: TokenStorage,
+  credentials: LoginCredentials,
+  logger?: AuthLogger,
+): Promise<LoginResult> {
+  let response = await postLogin(config, http, credentials);
+
+  // Server cookie still valid, SPA storage empty → login says "already logged in".
+  // Clear the cookie session once, then retry with the submitted credentials.
+  if (!response.ok && isAlreadyAuthenticated(response.data, response.status)) {
+    logger?.info('session.recover', 'Already authenticated on server — clearing cookie and retrying login');
+    await clearServerSession(config, http, storage, logger);
+    response = await postLogin(config, http, credentials);
+  }
 
   if (!response.ok) {
     logger?.error('session.unauthorized', 'Login request failed', {
