@@ -14,6 +14,7 @@ export type { CreateAuthOptions } from './core/resolveConfig';
 export { createStorage } from './core/storage';
 export { createLogger } from './core/logger';
 export { jwtMatchesAuthKey, decodeJwtPayload, normalizeBearerToken } from './core/jwt';
+export { hasUsableProfile } from './core/userProfile';
 export { createFetchProvider } from './http/fetchProvider';
 export { createHttp } from './http/createHttp';
 export type {

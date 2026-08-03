@@ -1,6 +1,6 @@
 {
   "name": "@pinooxhq/auth",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Auth for Pinoox themes — zero configuration. Token/session, authorized HTTP, and login redirects for Vue, React, and Svelte.",
   "type": "module",
   "main": "./dist/index.cjs",

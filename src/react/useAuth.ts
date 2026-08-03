@@ -17,6 +17,7 @@ import {
   type LoginCredentials,
   type LoginResult,
 } from '../core/createAuth';
+import { hasUsableProfile } from '../core/userProfile';
 
 export interface UseAuthReturn {
   auth: AuthInstance;
@@ -128,13 +129,13 @@ export function useAuth(): UseAuthReturn {
   }, [auth]);
 
   const canAccess = useCallback(async (refresh = false): Promise<boolean> => {
-    if (!refresh && auth.isAuthenticated) {
+    if (!refresh && auth.isAuthenticated && hasUsableProfile(auth.user)) {
       return true;
     }
 
-    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
+    // Hit me() for cookie sessions and to hydrate profile from JWT storage.
     const profile = await auth.me();
-    return !!profile || auth.isAuthenticated;
+    return hasUsableProfile(profile) || hasUsableProfile(auth.user) || auth.isAuthenticated;
   }, [auth]);
 
   const login = useCallback(async (credentials?: LoginCredentials): Promise<LoginResult | void> => {

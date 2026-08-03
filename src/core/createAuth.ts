@@ -231,8 +231,9 @@ export function createAuth(options: CreateAuthConfig = {}): AuthInstance {
         syncToken(extracted.token);
       }
 
-      user = extracted.user ?? (response.data as AuthUser);
-      authenticated = true;
+      // Never fall back to the raw API envelope ({ success, data, ... }).
+      user = extracted.user;
+      authenticated = !!user || !!resolveToken() || config.mode !== 'jwt';
       logger.info('session.ok', 'Session validated', {
         hasUser: !!user,
         hasToken: !!resolveToken(),

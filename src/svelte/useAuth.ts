@@ -8,6 +8,7 @@ import {
   type LoginCredentials,
   type LoginResult,
 } from '../core/createAuth';
+import { hasUsableProfile } from '../core/userProfile';
 
 export interface AuthStore {
   auth: AuthInstance;
@@ -97,13 +98,13 @@ export function createAuthStore(options: CreateAuthConfig = {}): AuthStore {
   const canAccess = async (refresh = false): Promise<boolean> => {
     token.set(auth.getToken());
 
-    if (!refresh && auth.isAuthenticated) {
+    if (!refresh && auth.isAuthenticated && hasUsableProfile(auth.user)) {
       return true;
     }
 
-    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
+    // Hit me() for cookie sessions and to hydrate profile from JWT storage.
     const profile = await me();
-    return !!profile || auth.isAuthenticated;
+    return hasUsableProfile(profile) || hasUsableProfile(auth.user) || auth.isAuthenticated;
   };
 
   const login = async (credentials?: LoginCredentials): Promise<LoginResult | void> => {
@@ -122,7 +123,7 @@ export function createAuthStore(options: CreateAuthConfig = {}): AuthStore {
     auth.isAuthenticated = true;
     token.set(loginKey);
 
-    if (userData) {
+    if (hasUsableProfile(userData)) {
       auth.user = userData;
       user.set(userData);
     }

@@ -26,9 +26,13 @@ export function extractTokenAndUser(payload: unknown): { token: string | null; u
     || (typeof (payload as { token?: string })?.token === 'string' && (payload as { token: string }).token)
     || null;
 
-  const userCandidate =
-    (data.user && typeof data.user === 'object' ? (data.user as AuthUser) : null)
-    || (data.username || data.email || data.user_id ? (data as AuthUser) : null);
+  const nestedUser = data.user && typeof data.user === 'object' ? (data.user as AuthUser) : null;
+  const flatUser =
+    (data.username || data.email || data.user_id || data.id || data.group_key)
+      ? (data as AuthUser)
+      : null;
+
+  const userCandidate = nestedUser || flatUser;
 
   return {
     token: tokenCandidate,

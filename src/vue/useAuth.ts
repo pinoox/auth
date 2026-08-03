@@ -9,6 +9,7 @@ import {
   type LoginCredentials,
   type LoginResult,
 } from '../core/createAuth';
+import { hasUsableProfile } from '../core/userProfile';
 
 export interface UseAuthReturn {
   auth: AuthInstance;
@@ -68,6 +69,7 @@ export function useAuth(): UseAuthReturn {
 
   auth.on('login', syncFromAuth);
   auth.on('logout', syncFromAuth);
+  auth.on('unauthorized', syncFromAuth);
 
   const isAuthenticated = computed(() => {
     // JWT in storage is enough — profile (`user`) may load later via me().
@@ -83,13 +85,14 @@ export function useAuth(): UseAuthReturn {
   const canAccess = async (refresh = false): Promise<boolean> => {
     token.value = auth.getToken();
 
-    if (!refresh && auth.isAuthenticated) {
+    // Token alone is not enough after a refresh — abilities/group_key live on me().
+    if (!refresh && auth.isAuthenticated && hasUsableProfile(auth.user ?? user.value)) {
       return true;
     }
 
-    // Always hit me() — HttpOnly cookies authenticate without local JWT storage.
+    // Hit me() for cookie sessions and to hydrate profile from JWT storage.
     const profile = await me();
-    return !!profile || auth.isAuthenticated;
+    return hasUsableProfile(profile) || hasUsableProfile(auth.user) || auth.isAuthenticated;
   };
 
   const login = async (credentials?: LoginCredentials): Promise<LoginResult | void> => {
@@ -152,7 +155,8 @@ export function createPiniaAuthStore(defineStore: typeof import('pinia').defineS
         token.value = loginKey;
         auth.isAuthenticated = true;
 
-        if (userData) {
+        // Ignore token-only stubs — callers should hydrate via me()/canUserAccess.
+        if (hasUsableProfile(userData)) {
           auth.user = userData;
           user.value = userData;
         }
