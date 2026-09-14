@@ -93,11 +93,14 @@ export function resolveEndpoint(
 ): string {
   const value = (typeof path === 'string' && path.trim() !== '' ? path.trim() : fallback);
 
-  if (/^https?:\/\//i.test(value) || value.startsWith('/')) {
+  if (/^https?:\/\//i.test(value)) {
     return value;
   }
 
   if (baseUrl) {
+    if (value.startsWith(baseUrl)) {
+      return value;
+    }
     return joinUrl(baseUrl, value);
   }
 
@@ -134,13 +137,27 @@ function normalizeStrategy(value: unknown): AuthStrategy | null {
   return null;
 }
 
-function defaultEndpoints(apiBase: string, strategy: AuthStrategy, baseUrl: string | null): Required<AuthEndpoints> {
+function defaultEndpoints(
+  apiBase: string,
+  strategy: AuthStrategy,
+  baseUrl: string | null,
+  bootAuth?: BootAuthConfig,
+): Required<AuthEndpoints> {
   if (strategy === 'remote') {
     if (baseUrl) {
       return {
         login: 'auth/login',
         logout: 'auth/logout',
         me: 'auth/get',
+      };
+    }
+
+    const isPlatform = bootAuth?.source === 'com_pinoox_manager' || bootAuth?.provider === 'platform';
+    if (isPlatform) {
+      return {
+        login: '/manager/api/v1/auth/login',
+        logout: '/manager/api/v1/auth/logout',
+        me: '/manager/api/v1/auth/get',
       };
     }
 
@@ -164,7 +181,7 @@ export function resolveConfig(options: CreateAuthOptions = {}, logger?: AuthLogg
   const apiBase = (options.apiBase ?? boot.url?.API ?? '').replace(/\/$/, '');
   const strategy = inferStrategy(bootAuth, options.strategy);
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? bootAuth.baseUrl ?? null);
-  const defaults = defaultEndpoints(apiBase || '/', strategy, baseUrl);
+  const defaults = defaultEndpoints(apiBase || '/', strategy, baseUrl, bootAuth);
   const bootEndpoints = bootAuth.endpoints ?? {};
 
   const endpoints: Required<AuthEndpoints> = {
@@ -189,10 +206,11 @@ export function resolveConfig(options: CreateAuthOptions = {}, logger?: AuthLogg
     });
   }
 
+  const isPlatform = bootAuth.source === 'com_pinoox_manager' || bootAuth.provider === 'platform';
   const loginUrl =
     options.loginUrl
     ?? bootAuth.loginUrl
-    ?? (strategy === 'remote' ? '/account/login' : null);
+    ?? (strategy === 'remote' ? (isPlatform ? '/manager/login' : '/account/login') : null);
 
   const appPath =
     (typeof boot.url?.BASE === 'string' && boot.url.BASE)

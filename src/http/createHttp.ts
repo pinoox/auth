@@ -56,12 +56,22 @@ function resolveBaseURL(auth: AuthInstance, explicit?: string): string {
   return raw.endsWith('/') ? raw : `${raw}/`;
 }
 
-function createAxiosAuthAdapter(client: AxiosInstanceLike): HttpClient {
+function createAxiosAuthAdapter(client: AxiosInstanceLike, siteOrigin?: string | null): HttpClient {
   return {
     async request<T = unknown>(input: HttpRequestInput): Promise<HttpResponse<T>> {
       try {
+        let requestUrl = input.url;
+        if (typeof requestUrl === 'string' && requestUrl.startsWith('/') && !/^https?:\/\//i.test(requestUrl)) {
+          if (siteOrigin) {
+            requestUrl = siteOrigin.replace(/\/$/, '') + requestUrl;
+          } else if (typeof window !== 'undefined' && window.location?.origin) {
+            requestUrl = window.location.origin + requestUrl;
+          }
+        }
+        const isAbsolute = typeof requestUrl === 'string' && /^https?:\/\//i.test(requestUrl);
         const response = await client.request<T>({
-          url: input.url,
+          url: requestUrl,
+          baseURL: isAbsolute ? '' : undefined,
           method: input.method ?? 'GET',
           headers: input.headers,
           data: input.body,
@@ -147,7 +157,7 @@ export function createHttp(options: CreateHttpOptions): AxiosInstanceLike {
   );
 
   if (options.syncAuth !== false) {
-    auth.setHttp(createAxiosAuthAdapter(client));
+    auth.setHttp(createAxiosAuthAdapter(client, auth.config.siteOrigin));
   }
 
   return client;
